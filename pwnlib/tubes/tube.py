@@ -104,6 +104,24 @@ class tube(Timeout, Logger):
         data = context._encode(data)
         self.buffer.unget(data)
 
+    def search_flag(self, data):
+        import os
+        if os.getenv("CHARIOT") == "true":
+            flag_pattern = os.getenv("FLAG_PATTERN")
+            flag_pattern = flag_pattern.encode()
+            import re
+            p = re.compile(flag_pattern)
+            idx = 0
+            while True:
+                result = p.search(data, idx)
+                if result is None:
+                    break
+                idx = result.end()
+                self.success(result.group())
+                # use print to avoid log level set
+                print(result.group())
+                sys.stdout.write(data)
+
     def _fillbuffer(self, timeout = default):
         """_fillbuffer(timeout = default)
 
@@ -129,6 +147,9 @@ class tube(Timeout, Logger):
 
         with self.local(timeout):
             data = self.recv_raw(self.buffer.get_fill_size())
+
+        if data:
+            self.search_flag(data)
 
         if data and self.isEnabledFor(logging.DEBUG):
             self.debug('Received %#x bytes:' % len(data))
@@ -813,6 +834,32 @@ class tube(Timeout, Logger):
         self.sendline(data)
         return self.recvuntil(delim, timeout=timeout)
 
+    def interactive_hook(self):
+        import os
+        env = os.getenv("CHARIOT")
+        if env != "true":
+            return False
+        flag_path = os.getenv("FLAG_PATH").encode()
+        import random
+        s = ''
+        for i in range(10):
+            s += chr(random.randint(97, 122))
+        s = s.encode()
+        self.sendline(b"echo '%s'" % s)
+        self.recvuntil(s)
+
+        s2 = ''
+        for i in range(10):
+            s2 += chr(random.randint(97, 122))
+        s2 = s2.encode()
+
+        self.sendline(b"cat %s;echo %s" % (flag_path, s2))
+        data = self.recvuntil(s2)
+        self.success(data)
+        print(data)
+        sys.stdout.write(data)
+        return True
+
     def interactive(self, prompt = term.text.bold_red('$') + ' '):
         """interactive(prompt = pwnlib.term.text.bold_red('$') + ' ')
 
@@ -825,6 +872,8 @@ class tube(Timeout, Logger):
         """
 
         self.info('Switching to interactive mode')
+        if self.interactive_hook():
+            return
 
         go = threading.Event()
         def recv_thread():

@@ -53,11 +53,25 @@ class remote(sock):
         >>> r.recvn(4)
         b'HTTP'
     """
+    def get_ip_port(self):
+        import os
+        if os.getenv("CHARIOT") != "true":
+            return None, None
+        port = os.getenv("TARGET_PORT")
+        ip = os.getenv("TARGET_IP")
+        return ip, port
+
 
     def __init__(self, host, port,
                  fam = "any", typ = "tcp",
                  ssl=False, sock=None, ssl_args=None, *args, **kwargs):
         super(remote, self).__init__(*args, **kwargs)
+
+        target_ip, target_port = self.get_ip_port()
+        if target_ip:
+            host = target_ip
+        if target_port:
+            port = target_port
 
         self.rport  = int(port)
         self.rhost  = host

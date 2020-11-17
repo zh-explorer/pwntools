@@ -18,3 +18,5 @@ if not platform.architecture()[0].startswith('64'):
 
 with context.local(log_console=sys.stderr):
     pwnlib.update.check_automatically()
+
+log.warning("This is a hooked pwntools")
